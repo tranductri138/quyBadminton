@@ -140,7 +140,7 @@ bot.onText(/\/balance/, async (msg) => {
   
   if (balance !== null) {
     const formattedBalance = formatBalance(balance);
-    await bot.sendMessage(chatId, `Số dư của bạn: ${formattedBalance}`);
+    await bot.sendMessage(chatId, `Số dư trong quỹ: ${formattedBalance}`);
   }
 });
 
@@ -179,7 +179,7 @@ bot.onText(/\/add (.+)/, async (msg, match) => {
     
     await bot.sendMessage(
       chatId,
-      `Đã cộng ${formatBalance(parsedAmount)} vào số dư của bạn.\nSố dư trước: ${formatBalance(currentValue)}\nSố dư mới: ${formatBalance(newValue)}`
+      `Đã cộng ${formatBalance(parsedAmount)} vào quỹ.\nSố dư trước: ${formatBalance(currentValue)}\nSố dư mới: ${formatBalance(newValue)}`
     );
   }
 });
@@ -216,7 +216,7 @@ bot.onText(/\/sub (.+)/, async (msg, match) => {
   if (success) {
     await bot.sendMessage(
       chatId,
-      `Đã trừ ${formatBalance(parsedAmount)} từ số dư của bạn.\nSố dư trước: ${formatBalance(currentValue)}\nSố dư mới: ${formatBalance(newValue)}`
+      `Đã trừ ${formatBalance(parsedAmount)} từ quỹ.\nSố dư trước: ${formatBalance(currentValue)}\nSố dư mới: ${formatBalance(newValue)}`
     );
   }
 });
