@@ -121,7 +121,7 @@ bot.onText(/\/help/, (msg) => {
 
 *Ví dụ:*
 /add 200 - Cộng 200k vào quỹ
-/sub 1000 - Trừ 1tr từ quỹ
+/sub 1tr - Trừ 1tr từ quỹ
 `;
   bot.sendMessage(chatId, helpText, { parse_mode: 'Markdown' });
 });
