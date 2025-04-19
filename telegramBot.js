@@ -1,11 +1,19 @@
 require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
-const fs = require('fs');
-const path = require('path');
+const { readMoney, writeMoney } = require('./redisClient');
 
-const dataFilePath = path.join(__dirname, 'data.txt');
-
+// Token của bot từ BotFather
 const token = process.env.TELEGRAM_BOT_TOKEN;
+
+// Kiểm tra token hợp lệ trước khi khởi tạo bot
+if (!token || token === 'your_telegram_bot_token' || token.includes('your_')) {
+  console.log('CẢNH BÁO: Token Telegram bot chưa được cấu hình. Bot sẽ không hoạt động.');
+  // Export một đối tượng giả để tránh lỗi khi import
+  module.exports = {
+    isConfigured: false
+  };
+  return; // Dừng việc khởi tạo bot
+}
 
 // Function để định dạng số tiền theo cách đọc dễ dàng
 function formatBalance(amount) {
@@ -71,27 +79,6 @@ function parseAmount(amountStr) {
   return parseFloat(amountStr) || 0;
 }
 
-// Function để đọc số tiền từ file data.txt
-function readMoney() {
-  try {
-    const data = fs.readFileSync(dataFilePath, 'utf8');
-    return parseFloat(data) || 0;
-  } catch (error) {
-    console.error('Lỗi khi đọc file:', error);
-    return 0;
-  }
-}
-
-function writeMoney(amount) {
-  try {
-    fs.writeFileSync(dataFilePath, amount.toString());
-    return true;
-  } catch (error) {
-    console.error('Lỗi khi ghi file:', error);
-    return false;
-  }
-}
-
 // Tạo bot với polling
 const bot = new TelegramBot(token, { polling: true });
 
@@ -127,16 +114,16 @@ bot.onText(/\/help/, (msg) => {
 });
 
 // Xử lý lệnh /balance
-bot.onText(/\/balance/, (msg) => {
+bot.onText(/\/balance/, async (msg) => {
   const chatId = msg.chat.id;
   
-  const currentMoney = readMoney();
+  const currentMoney = await readMoney();
   const formattedBalance = formatBalance(currentMoney);
   
   bot.sendMessage(chatId, `Số dư hiện tại: ${formattedBalance}`);
 });
 
-bot.onText(/\/add (.+)/, (msg, match) => {
+bot.onText(/\/add (.+)/, async (msg, match) => {
   const chatId = msg.chat.id;
   
   if (!isAdmin(msg)) {
@@ -150,10 +137,10 @@ bot.onText(/\/add (.+)/, (msg, match) => {
     return bot.sendMessage(chatId, 'Vui lòng nhập số tiền hợp lệ và lớn hơn 0.');
   }
   
-  const currentMoney = readMoney();
+  const currentMoney = await readMoney();
   const newMoney = currentMoney + parsedAmount;
   
-  if (writeMoney(newMoney)) {
+  if (await writeMoney(newMoney)) {
     bot.sendMessage(
       chatId,
       `Đã cộng ${parsedAmount}k vào quỹ.\nSố dư trước: ${formatBalance(currentMoney)}\nSố dư mới: ${formatBalance(newMoney)}`
@@ -163,7 +150,7 @@ bot.onText(/\/add (.+)/, (msg, match) => {
   }
 });
 
-bot.onText(/\/sub (.+)/, (msg, match) => {
+bot.onText(/\/sub (.+)/, async (msg, match) => {
   const chatId = msg.chat.id;
   
   if (!isAdmin(msg)) {
@@ -177,10 +164,10 @@ bot.onText(/\/sub (.+)/, (msg, match) => {
     return bot.sendMessage(chatId, 'Vui lòng nhập số tiền hợp lệ và lớn hơn 0.');
   }
   
-  const currentMoney = readMoney();
+  const currentMoney = await readMoney();
   const newMoney = currentMoney - parsedAmount;
   
-  if (writeMoney(newMoney)) {
+  if (await writeMoney(newMoney)) {
     bot.sendMessage(
       chatId,
       `Đã trừ ${parsedAmount} khỏi quỹ.\nSố dư trước: ${formatBalance(currentMoney)}\nSố dư mới: ${formatBalance(newMoney)}`
