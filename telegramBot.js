@@ -1,6 +1,6 @@
 require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
-const { readMoney, writeMoney } = require('./fileStorage');
+const db = require('./dbStorage');
 
 // Token của bot từ BotFather
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -10,38 +10,32 @@ if (!token || token === 'your_telegram_bot_token' || token.includes('your_')) {
   console.log('CẢNH BÁO: Token Telegram bot chưa được cấu hình. Bot sẽ không hoạt động.');
   // Export một đối tượng giả để tránh lỗi khi import
   module.exports = {
-    isConfigured: false
+    isConfigured: false,
+    bot: null
   };
   return; // Dừng việc khởi tạo bot
 }
 
 // Function để định dạng số tiền theo cách đọc dễ dàng
 function formatBalance(amount) {
-  // Chuyển đổi amount thành số (phòng trường hợp nó là chuỗi)
   amount = parseFloat(amount);
   
   if (isNaN(amount)) {
     return '0';
   }
   
-  // Nếu số là âm, lấy giá trị tuyệt đối và thêm dấu trừ sau khi định dạng
   const isNegative = amount < 0;
   amount = Math.abs(amount);
   
-  // Nếu số nhỏ hơn 1000, thêm 'k' vào sau
   if (amount < 1000) {
     return `${isNegative ? '-' : ''}${amount}k`;
-  } 
-  // Nếu số lớn hơn hoặc bằng 1000
-  else {
+  } else {
     const millions = Math.floor(amount / 1000);
     const remaining = amount % 1000;
     
     if (remaining === 0) {
-      // Nếu không có phần dư, chỉ hiển thị phần triệu
       return `${isNegative ? '-' : ''}${millions}tr`;
     } else {
-      // Nếu có phần dư, hiển thị cả phần triệu và phần dư
       return `${isNegative ? '-' : ''}${millions}tr ${remaining}k`;
     }
   }
@@ -57,15 +51,15 @@ function parseAmount(amountStr) {
       const numericValue = parseFloat(numericMatch[1]);
       
       if (cleanedStr.includes('k') || cleanedStr.includes('nghìn') || cleanedStr.includes('nghin')) {
-        return numericValue; // Đã quy ước 1k = 1
+        return numericValue;
       }
       
       if (cleanedStr.includes('tr') || cleanedStr.includes('triệu') || cleanedStr.includes('trieu')) {
-        return numericValue * 1000; // 1tr = 1000
+        return numericValue * 1000;
       }
       
       if (cleanedStr.includes('tỷ') || cleanedStr.includes('ty')) {
-        return numericValue * 1000000; // 1 tỷ = 1,000,000
+        return numericValue * 1000000;
       }
       
       return numericValue;
@@ -77,96 +71,162 @@ function parseAmount(amountStr) {
 
 const bot = new TelegramBot(token, { polling: true });
 
+// Database operation wrapper to handle async operations
+const handleDbOperation = async (chatId, operation, errorMessage) => {
+  try {
+    return await operation();
+  } catch (error) {
+    console.error(error);
+    if (chatId) {
+      await bot.sendMessage(chatId, errorMessage || 'Có lỗi xảy ra khi truy cập database.');
+    }
+    return null;
+  }
+};
+
 const ADMIN_IDS = [
   // Thêm ID của admin vào đây
   // Ví dụ: 123456789
 ];
 
 function isAdmin(msg) {
-  // Bỏ kiểm tra admin, cho phép tất cả người dùng sử dụng bot
   return true;
 }
 
-bot.onText(/\/start/, (msg) => {
+bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
-  bot.sendMessage(chatId, 'Chào mừng đến với Bot Quản lý Quỹ! Sử dụng /help để xem các lệnh.');
+  
+  await handleDbOperation(chatId, 
+    async () => await db.addChatId(chatId.toString()),
+    'Có lỗi xảy ra khi khởi tạo dữ liệu người dùng.'
+  );
+  
+  await bot.sendMessage(chatId, 'Chào mừng đến với Bot Quản lý Quỹ! Sử dụng /help để xem các lệnh.');
 });
 
-bot.onText(/\/help/, (msg) => {
+bot.onText(/\/help/, async (msg) => {
   const chatId = msg.chat.id;
+  
+  await handleDbOperation(chatId, 
+    async () => await db.addChatId(chatId.toString()),
+    'Có lỗi xảy ra khi khởi tạo dữ liệu người dùng.'
+  );
+  
   const helpText = `
 *Danh sách lệnh:*
-/balance - Kiểm tra số dư
-/add X - Cộng X vào quỹ 
-/sub X - Trừ X từ quỹ 
+/balance - Kiểm tra tổng số dư
+/add X - Cộng X vào số dư của bạn
+/sub X - Trừ X từ số dư của bạn
 
 *Ví dụ:*
-/add 200 - Cộng 200k vào quỹ
-/sub 1tr - Trừ 1tr từ quỹ
+/add 200 - Cộng 200k vào số dư của bạn
+/sub 1tr - Trừ 1tr từ số dư của bạn
 `;
-  bot.sendMessage(chatId, helpText, { parse_mode: 'Markdown' });
+  await bot.sendMessage(chatId, helpText, { parse_mode: 'Markdown' });
 });
 
-bot.onText(/\/balance/, (msg) => {
+bot.onText(/\/balance/, async (msg) => {
   const chatId = msg.chat.id;
   
-  const currentMoney = readMoney();
-  const formattedBalance = formatBalance(currentMoney);
+  await handleDbOperation(chatId, 
+    async () => await db.addChatId(chatId.toString()),
+    'Có lỗi xảy ra khi khởi tạo dữ liệu người dùng.'
+  );
   
-  bot.sendMessage(chatId, `Số dư hiện tại: ${formattedBalance}`);
-});
-
-bot.onText(/\/add (.+)/, (msg, match) => {
-  const chatId = msg.chat.id;
+  const balance = await handleDbOperation(chatId,
+    async () => await db.getChatValue(chatId.toString()),
+    'Có lỗi xảy ra khi lấy số dư.'
+  );
   
-  if (!isAdmin(msg)) {
-    return bot.sendMessage(chatId, 'Bạn không có quyền sử dụng lệnh này.');
+  if (balance !== null) {
+    const formattedBalance = formatBalance(balance);
+    await bot.sendMessage(chatId, `Số dư của bạn: ${formattedBalance}`);
   }
+});
+
+bot.onText(/\/add (.+)/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  
+  await handleDbOperation(chatId, 
+    async () => await db.addChatId(chatId.toString()),
+    'Có lỗi xảy ra khi khởi tạo dữ liệu người dùng.'
+  );
   
   const amountStr = match[1];
   const parsedAmount = parseAmount(amountStr);
   
   if (isNaN(parsedAmount) || parsedAmount <= 0) {
-    return bot.sendMessage(chatId, 'Vui lòng nhập số tiền hợp lệ và lớn hơn 0.');
+    return await bot.sendMessage(chatId, 'Vui lòng nhập số tiền hợp lệ và lớn hơn 0.');
   }
   
-  const currentMoney = readMoney();
-  const newMoney = currentMoney + parsedAmount;
+  const currentValue = await handleDbOperation(chatId,
+    async () => await db.getChatValue(chatId.toString()),
+    'Có lỗi xảy ra khi lấy số dư cá nhân.'
+  );
   
-  if (writeMoney(newMoney)) {
-    bot.sendMessage(
+  if (currentValue === null) return;
+  
+  const newValue = currentValue + parsedAmount;
+  
+  const success = await handleDbOperation(chatId,
+    async () => await db.setChatValue(chatId.toString(), newValue),
+    'Có lỗi xảy ra khi cập nhật số dư.'
+  );
+  
+  if (success) {
+    // Gọi getTotalMoney với chatId để chỉ lấy số dư của chatId hiện tại
+    const balance = await db.getChatValue(chatId.toString());
+    
+    await bot.sendMessage(
       chatId,
-      `Đã cộng ${parsedAmount}k vào quỹ.\nSố dư trước: ${formatBalance(currentMoney)}\nSố dư mới: ${formatBalance(newMoney)}`
+      `Đã cộng ${formatBalance(parsedAmount)} vào số dư của bạn.\nSố dư trước: ${formatBalance(currentValue)}\nSố dư mới: ${formatBalance(newValue)}`
     );
-  } else {
-    bot.sendMessage(chatId, 'Có lỗi xảy ra khi cập nhật số dư.');
   }
 });
 
-bot.onText(/\/sub (.+)/, (msg, match) => {
+bot.onText(/\/sub (.+)/, async (msg, match) => {
   const chatId = msg.chat.id;
   
-  if (!isAdmin(msg)) {
-    return bot.sendMessage(chatId, 'Bạn không có quyền sử dụng lệnh này.');
-  }
+  await handleDbOperation(chatId, 
+    async () => await db.addChatId(chatId.toString()),
+    'Có lỗi xảy ra khi khởi tạo dữ liệu người dùng.'
+  );
   
   const amountStr = match[1];
   const parsedAmount = parseAmount(amountStr);
   
   if (isNaN(parsedAmount) || parsedAmount <= 0) {
-    return bot.sendMessage(chatId, 'Vui lòng nhập số tiền hợp lệ và lớn hơn 0.');
+    return await bot.sendMessage(chatId, 'Vui lòng nhập số tiền hợp lệ và lớn hơn 0.');
   }
   
-  const currentMoney = readMoney();
-  const newMoney = currentMoney - parsedAmount;
+  const currentValue = await handleDbOperation(chatId,
+    async () => await db.getChatValue(chatId.toString()),
+    'Có lỗi xảy ra khi lấy số dư cá nhân.'
+  );
   
-  if (writeMoney(newMoney)) {
-    bot.sendMessage(
+  if (currentValue === null) return;
+  
+  const newValue = currentValue - parsedAmount;
+  
+  const success = await handleDbOperation(chatId,
+    async () => await db.setChatValue(chatId.toString(), newValue),
+    'Có lỗi xảy ra khi cập nhật số dư.'
+  );
+  
+  if (success) {
+    await bot.sendMessage(
       chatId,
-      `Đã trừ ${parsedAmount} khỏi quỹ.\nSố dư trước: ${formatBalance(currentMoney)}\nSố dư mới: ${formatBalance(newMoney)}`
+      `Đã trừ ${formatBalance(parsedAmount)} từ số dư của bạn.\nSố dư trước: ${formatBalance(currentValue)}\nSố dư mới: ${formatBalance(newValue)}`
     );
-  } else {
-    bot.sendMessage(chatId, 'Có lỗi xảy ra khi cập nhật số dư.');
+  }
+});
+
+bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
+  try {
+    await db.addChatId(chatId.toString());
+  } catch (error) {
+    console.error(`Error adding chat ID ${chatId}:`, error);
   }
 });
 
@@ -176,4 +236,6 @@ bot.on('polling_error', (error) => {
 
 console.log('Bot Telegram đã được khởi động!');
 
-module.exports = bot;
+module.exports = {
+  bot
+};
