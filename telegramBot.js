@@ -49,16 +49,13 @@ function formatBalance(amount) {
 
 function parseAmount(amountStr) {
   if (typeof amountStr === 'string') {
-    // Loại bỏ khoảng trắng, dấu phẩy và chuyển về chữ thường
     const cleanedStr = amountStr.trim().toLowerCase().replace(/,/g, '');
     
-    // Trích xuất tất cả các chữ số từ chuỗi (bao gồm cả số thập phân)
     const numericMatch = cleanedStr.match(/(\d+(\.\d+)?)/);
     
     if (numericMatch && numericMatch[1]) {
       const numericValue = parseFloat(numericMatch[1]);
       
-      // Xử lý hậu tố để nhân với hệ số phù hợp
       if (cleanedStr.includes('k') || cleanedStr.includes('nghìn') || cleanedStr.includes('nghin')) {
         return numericValue; // Đã quy ước 1k = 1
       }
@@ -75,11 +72,9 @@ function parseAmount(amountStr) {
     }
   }
   
-  // Nếu không tìm thấy số, thử chuyển trực tiếp thành số
   return parseFloat(amountStr) || 0;
 }
 
-// Tạo bot với polling
 const bot = new TelegramBot(token, { polling: true });
 
 const ADMIN_IDS = [
@@ -97,7 +92,6 @@ bot.onText(/\/start/, (msg) => {
   bot.sendMessage(chatId, 'Chào mừng đến với Bot Quản lý Quỹ! Sử dụng /help để xem các lệnh.');
 });
 
-// Xử lý lệnh /help
 bot.onText(/\/help/, (msg) => {
   const chatId = msg.chat.id;
   const helpText = `
@@ -113,7 +107,6 @@ bot.onText(/\/help/, (msg) => {
   bot.sendMessage(chatId, helpText, { parse_mode: 'Markdown' });
 });
 
-// Xử lý lệnh /balance
 bot.onText(/\/balance/, async (msg) => {
   const chatId = msg.chat.id;
   

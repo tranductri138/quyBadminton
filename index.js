@@ -1,15 +1,12 @@
 require('dotenv').config();
 const express = require('express');
-const path = require('path');
 
 const app = express();
 const PORT = 3000;
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
 
-// Import Redis client
 const { readMoney, writeMoney } = require('./redisClient');
 
-// Khởi động Telegram Bot
 require('./telegramBot');
 
 app.use(express.json());
@@ -144,5 +141,5 @@ app.get('/api/balance', verifyToken, async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Server đang chạy tại http://localhost:${PORT}`);
+  console.log(`Server đang chạy tại cổng: ${PORT}`);
 });
