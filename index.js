@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
@@ -5,7 +6,7 @@ const path = require('path');
 const app = express();
 const PORT = 3000;
 const dataFilePath = path.join(__dirname, 'data.txt');
-const ACCESS_TOKEN = 'aX7p9Qrz5L12'; 
+const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
 
 if (!fs.existsSync(dataFilePath)) {
   try {
