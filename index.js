@@ -1,12 +1,15 @@
 require('dotenv').config();
 const express = require('express');
+const path = require('path');
 
 const app = express();
 const PORT = 3000;
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
 
-const { readMoney, writeMoney } = require('./redisClient');
+// Import File Storage module thay vì Redis
+const { readMoney, writeMoney } = require('./fileStorage');
 
+// Khởi động Telegram Bot
 require('./telegramBot');
 
 app.use(express.json());
@@ -78,18 +81,18 @@ function parseAmount(amountStr) {
   return parseFloat(amountStr) || 0;
 }
 
-app.post('/api/add', verifyToken, async (req, res) => {
+app.post('/api/add', verifyToken, (req, res) => {
   const { amount } = req.body;
   
   if (!amount || (isNaN(parseAmount(amount)) || parseAmount(amount) <= 0)) {
     return res.status(400).json({ error: 'Số tiền cần cộng phải là số dương' });
   }
 
-  const currentMoney = await readMoney();
+  const currentMoney = readMoney();
   const parsedAmount = parseAmount(amount);
   const newMoney = currentMoney + parsedAmount;
   
-  if (await writeMoney(newMoney)) {
+  if (writeMoney(newMoney)) {
     res.json({
       success: true,
       message: `Đã cộng ${parsedAmount} vào tài khoản`,
@@ -105,18 +108,18 @@ app.post('/api/add', verifyToken, async (req, res) => {
   }
 });
 
-app.post('/api/subtract', verifyToken, async (req, res) => {
+app.post('/api/subtract', verifyToken, (req, res) => {
   const { amount } = req.body;
   
   if (!amount || (isNaN(parseAmount(amount)) || parseAmount(amount) <= 0)) {
     return res.status(400).json({ error: 'Số tiền cần trừ phải là số dương' });
   }
   
-  const currentMoney = await readMoney();
+  const currentMoney = readMoney();
   const parsedAmount = parseAmount(amount);
   const newMoney = currentMoney - parsedAmount;
   
-  if (await writeMoney(newMoney)) {
+  if (writeMoney(newMoney)) {
     res.json({
       success: true,
       message: `Đã trừ ${parsedAmount} từ tài khoản`,
@@ -132,8 +135,8 @@ app.post('/api/subtract', verifyToken, async (req, res) => {
   }
 });
 
-app.get('/api/balance', verifyToken, async (req, res) => {
-  const currentMoney = await readMoney();
+app.get('/api/balance', verifyToken, (req, res) => {
+  const currentMoney = readMoney();
   res.json({
     balance: currentMoney,
     formattedBalance: formatBalance(currentMoney)

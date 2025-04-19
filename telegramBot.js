@@ -1,6 +1,6 @@
 require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
-const { readMoney, writeMoney } = require('./redisClient');
+const { readMoney, writeMoney } = require('./fileStorage');
 
 // Token của bot từ BotFather
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -107,16 +107,16 @@ bot.onText(/\/help/, (msg) => {
   bot.sendMessage(chatId, helpText, { parse_mode: 'Markdown' });
 });
 
-bot.onText(/\/balance/, async (msg) => {
+bot.onText(/\/balance/, (msg) => {
   const chatId = msg.chat.id;
   
-  const currentMoney = await readMoney();
+  const currentMoney = readMoney();
   const formattedBalance = formatBalance(currentMoney);
   
   bot.sendMessage(chatId, `Số dư hiện tại: ${formattedBalance}`);
 });
 
-bot.onText(/\/add (.+)/, async (msg, match) => {
+bot.onText(/\/add (.+)/, (msg, match) => {
   const chatId = msg.chat.id;
   
   if (!isAdmin(msg)) {
@@ -130,10 +130,10 @@ bot.onText(/\/add (.+)/, async (msg, match) => {
     return bot.sendMessage(chatId, 'Vui lòng nhập số tiền hợp lệ và lớn hơn 0.');
   }
   
-  const currentMoney = await readMoney();
+  const currentMoney = readMoney();
   const newMoney = currentMoney + parsedAmount;
   
-  if (await writeMoney(newMoney)) {
+  if (writeMoney(newMoney)) {
     bot.sendMessage(
       chatId,
       `Đã cộng ${parsedAmount}k vào quỹ.\nSố dư trước: ${formatBalance(currentMoney)}\nSố dư mới: ${formatBalance(newMoney)}`
@@ -143,7 +143,7 @@ bot.onText(/\/add (.+)/, async (msg, match) => {
   }
 });
 
-bot.onText(/\/sub (.+)/, async (msg, match) => {
+bot.onText(/\/sub (.+)/, (msg, match) => {
   const chatId = msg.chat.id;
   
   if (!isAdmin(msg)) {
@@ -157,10 +157,10 @@ bot.onText(/\/sub (.+)/, async (msg, match) => {
     return bot.sendMessage(chatId, 'Vui lòng nhập số tiền hợp lệ và lớn hơn 0.');
   }
   
-  const currentMoney = await readMoney();
+  const currentMoney = readMoney();
   const newMoney = currentMoney - parsedAmount;
   
-  if (await writeMoney(newMoney)) {
+  if (writeMoney(newMoney)) {
     bot.sendMessage(
       chatId,
       `Đã trừ ${parsedAmount} khỏi quỹ.\nSố dư trước: ${formatBalance(currentMoney)}\nSố dư mới: ${formatBalance(newMoney)}`
