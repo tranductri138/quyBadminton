@@ -8,6 +8,9 @@ const PORT = 3000;
 const dataFilePath = path.join(__dirname, 'data.txt');
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
 
+// Khởi động Telegram Bot
+require('./telegramBot');
+
 if (!fs.existsSync(dataFilePath)) {
   try {
     fs.writeFileSync(dataFilePath, '0');
@@ -78,8 +81,32 @@ function writeMoney(amount) {
   }
 }
 
-function parseAmount(amount) {
-  return parseFloat(amount);
+function parseAmount(amountStr) {
+  if (typeof amountStr === 'string') {
+    const cleanedStr = amountStr.trim().toLowerCase().replace(/,/g, '');
+    
+    const numericMatch = cleanedStr.match(/(\d+(\.\d+)?)/);
+    
+    if (numericMatch && numericMatch[1]) {
+      const numericValue = parseFloat(numericMatch[1]);
+      
+      if (cleanedStr.includes('k') || cleanedStr.includes('nghìn') || cleanedStr.includes('nghin')) {
+        return numericValue; // Đã quy ước 1k = 1
+      }
+      
+      if (cleanedStr.includes('tr') || cleanedStr.includes('triệu') || cleanedStr.includes('trieu')) {
+        return numericValue * 1000; // 1tr = 1000
+      }
+      
+      if (cleanedStr.includes('tỷ') || cleanedStr.includes('ty')) {
+        return numericValue * 1000000; // 1 tỷ = 1,000,000
+      }
+      
+      return numericValue;
+    }
+  }
+  
+  return parseFloat(amountStr) || 0;
 }
 
 app.post('/api/add', verifyToken, (req, res) => {
